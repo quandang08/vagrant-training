@@ -5,96 +5,121 @@ require_once 'BaseModel.php';
 class UserModel extends BaseModel {
 
     public function findUserById($id) {
-        $sql = 'SELECT * FROM users WHERE id = '.$id;
-        $user = $this->select($sql);
-
-        return $user;
+        $sql = "SELECT * FROM users WHERE id = ?";
+        $stmt = self::$_connection->prepare($sql);
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $user = $res->fetch_assoc();
+        $stmt->close();
+        return $user ? $user : null;
     }
 
     public function findUser($keyword) {
-        $sql = 'SELECT * FROM users WHERE user_name LIKE %'.$keyword.'%'. ' OR user_email LIKE %'.$keyword.'%';
-        $user = $this->select($sql);
-
-        return $user;
+        $like = '%' . $keyword . '%';
+        $sql = "SELECT * FROM users WHERE username LIKE ? OR email LIKE ?";
+        $stmt = self::$_connection->prepare($sql);
+        $stmt->bind_param('ss', $like, $like);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $rows = [];
+        while ($r = $res->fetch_assoc()) $rows[] = $r;
+        $stmt->close();
+        return $rows;
     }
 
     /**
      * Authentication user
      * @param $userName
      * @param $password
-     * @return array
+     * @return array|null
      */
     public function auth($userName, $password) {
+        // NOTE: your DB currently stores MD5(password) from earlier steps.
+        // If you later migrate to password_hash(), change this accordingly.
         $md5Password = md5($password);
-        $sql = 'SELECT * FROM users WHERE name = "' . $userName . '" AND password = "'.$md5Password.'"';
-
-        $user = $this->select($sql);
-        return $user;
+        $sql = "SELECT * FROM users WHERE username = ? AND password = ?";
+        $stmt = self::$_connection->prepare($sql);
+        $stmt->bind_param('ss', $userName, $md5Password);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $user = $res->fetch_assoc();
+        $stmt->close();
+        return $user ? $user : null;
     }
 
-    /**
-     * Delete user by id
-     * @param $id
-     * @return mixed
-     */
     public function deleteUserById($id) {
-        $sql = 'DELETE FROM users WHERE id = '.$id;
-        return $this->delete($sql);
-
+        $sql = "DELETE FROM users WHERE id = ?";
+        $stmt = self::$_connection->prepare($sql);
+        $stmt->bind_param('i', $id);
+        $ok = $stmt->execute();
+        $stmt->close();
+        return $ok;
     }
 
-    /**
-     * Update user
-     * @param $input
-     * @return mixed
-     */
     public function updateUser($input) {
-        $sql = 'UPDATE users SET 
-                 name = "' . mysqli_real_escape_string(self::$_connection, $input['name']) .'", 
-                 password="'. md5($input['password']) .'"
-                WHERE id = ' . $input['id'];
+        // Expecting keys: id, username, password (optionally full_name, email)
+        $id = (int)$input['id'];
+        $username = $input['username'] ?? null;
+        $password = isset($input['password']) ? md5($input['password']) : null;
+        $full_name = $input['full_name'] ?? null;
+        $email = $input['email'] ?? null;
 
-        $user = $this->update($sql);
+        // Build dynamic update safely
+        $sets = [];
+        $types = '';
+        $values = [];
 
-        return $user;
+        if ($username !== null) { $sets[] = "username = ?"; $types .= 's'; $values[] = $username; }
+        if ($password !== null) { $sets[] = "password = ?"; $types .= 's'; $values[] = $password; }
+        if ($full_name !== null) { $sets[] = "full_name = ?"; $types .= 's'; $values[] = $full_name; }
+        if ($email !== null) { $sets[] = "email = ?"; $types .= 's'; $values[] = $email; }
+
+        if (empty($sets)) return false;
+
+        $sql = "UPDATE users SET " . implode(', ', $sets) . " WHERE id = ?";
+        $types .= 'i';
+        $values[] = $id;
+
+        $stmt = self::$_connection->prepare($sql);
+        $stmt->bind_param($types, ...$values);
+        $ok = $stmt->execute();
+        $stmt->close();
+        return $ok;
     }
 
-    /**
-     * Insert user
-     * @param $input
-     * @return mixed
-     */
     public function insertUser($input) {
-        $sql = "INSERT INTO `app_web1`.`users` (`name`, `password`) VALUES (" .
-                "'" . $input['name'] . "', '".md5($input['password'])."')";
+        // Expecting username, password, (optionally full_name, email)
+        $username = $input['username'];
+        $password = md5($input['password']);
+        $full_name = $input['full_name'] ?? null;
+        $email = $input['email'] ?? null;
 
-        $user = $this->insert($sql);
-
-        return $user;
+        $sql = "INSERT INTO users (username, password, full_name, email) VALUES (?, ?, ?, ?)";
+        $stmt = self::$_connection->prepare($sql);
+        $stmt->bind_param('ssss', $username, $password, $full_name, $email);
+        $ok = $stmt->execute();
+        $insertId = $stmt->insert_id;
+        $stmt->close();
+        return $ok ? $insertId : false;
     }
 
-    /**
-     * Search users
-     * @param array $params
-     * @return array
-     */
     public function getUsers($params = []) {
-        //Keyword
         if (!empty($params['keyword'])) {
-            $sql = 'SELECT * FROM users WHERE name LIKE "%' . $params['keyword'] .'%"';
-
-            //Keep this line to use Sql Injection
-            //Don't change
-            //Example keyword: abcef%";TRUNCATE banks;##
-            $users = self::$_connection->multi_query($sql);
-
-            //Get data
-            $users = $this->query($sql);
+            $like = '%' . $params['keyword'] . '%';
+            $sql = "SELECT * FROM users WHERE username LIKE ? OR email LIKE ?";
+            $stmt = self::$_connection->prepare($sql);
+            $stmt->bind_param('ss', $like, $like);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            $rows = [];
+            while ($r = $res->fetch_assoc()) $rows[] = $r;
+            $stmt->close();
+            return $rows;
         } else {
-            $sql = 'SELECT * FROM users';
-            $users = $this->select($sql);
+            $sql = "SELECT * FROM users";
+            $res = $this->select($sql);
+            return $res;
         }
-
-        return $users;
     }
 }
