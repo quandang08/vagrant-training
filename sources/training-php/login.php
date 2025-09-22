@@ -7,13 +7,13 @@ $errors = '';
 $username = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = $_POST['username'] ?? '';
-    $password = $_POST['password'] ?? '';
+    $username = trim($_POST['username'] ?? '');
+    $password = trim($_POST['password'] ?? '');
 
     $user = $userModel->auth($username, $password);
 
-    if (!empty($user) && isset($user[0])) {
-        $_SESSION['user'] = $user[0];
+    if (!empty($user)) {
+        $_SESSION['user'] = $user;  // chỉ $user, không phải $user[0]
         $_SESSION['message'] = 'Login successful';
 
         // Redirect sang list_users.php
@@ -27,12 +27,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <!DOCTYPE html>
 <html>
-
 <head>
     <title>User form</title>
     <?php include 'views/meta.php' ?>
 </head>
-
 <body>
     <?php include 'views/header.php' ?>
 
@@ -40,6 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php if ($errors): ?>
             <div style="color:red;"><?php echo htmlspecialchars($errors); ?></div>
         <?php endif; ?>
+
         <div id="loginbox" style="margin-top:50px;" class="mainbox col-md-6 col-md-offset-3 col-sm-8 col-sm-offset-2">
             <div class="panel panel-info">
                 <div class="panel-heading">
@@ -51,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <form method="post" action="login.php" class="form-horizontal" role="form">
                         <div class="margin-bottom-25 input-group">
                             <span class="input-group-addon"><i class="glyphicon glyphicon-user"></i></span>
-                            <input id="login-username" type="text" class="form-control" name="username" value="" placeholder="username or email">
+                            <input id="login-username" type="text" class="form-control" name="username" value="<?php echo htmlspecialchars($username); ?>" placeholder="username or email">
                         </div>
 
                         <div class="margin-bottom-25 input-group">
@@ -60,12 +59,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
 
                         <div class="margin-bottom-25">
-                            <input type="checkbox" tabindex="3" class="" name="remember" id="remember">
+                            <input type="checkbox" tabindex="3" name="remember" id="remember">
                             <label for="remember"> Remember Me</label>
                         </div>
 
                         <div class="margin-bottom-25 input-group">
-                            <!-- Button -->
                             <div class="col-sm-12 controls">
                                 <button type="submit" name="submit" value="submit" class="btn btn-primary">Submit</button>
                                 <a id="btn-fblogin" href="#" class="btn btn-primary">Login with Facebook</a>
@@ -75,9 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <div class="form-group">
                             <div class="col-md-12 control">
                                 Don't have an account!
-                                <a href="form_user.php">
-                                    Sign Up Here
-                                </a>
+                                <a href="form_user.php">Sign Up Here</a>
                             </div>
                         </div>
                     </form>
@@ -86,5 +82,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </div>
 </body>
-
 </html>
