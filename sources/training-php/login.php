@@ -1,5 +1,4 @@
 <?php
-session_start();
 require_once 'models/UserModel.php';
 
 $userModel = new UserModel();
@@ -13,11 +12,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $user = $userModel->auth($username, $password);
 
     if (!empty($user)) {
-        $_SESSION['user'] = $user;  // chỉ $user, không phải $user[0]
-        $_SESSION['message'] = 'Login successful';
+        $redis = new Redis();
+        $redis->connect('web-redis', 6379);
 
-        // Redirect sang list_users.php
-        header('Location: list_users.php');
+        // Tạo sessionId mới
+        $sessionId = bin2hex(random_bytes(16));
+        $sessionKey = "session_user_" . $sessionId;
+        $user['name'] = $user['username']; 
+        $redis->setex($sessionKey, 1800, json_encode($user)); // TTL 30 phút
+
+        // Cookie server
+        setcookie("session_id", $sessionId, time() + 1800, "/");
+
+        // JS lưu localStorage
+        echo '<script>
+            localStorage.clear(); // xóa dữ liệu cũ
+            localStorage.setItem("session_id", "' . $sessionId . '");
+            localStorage.setItem("user_id", "' . $user['id'] . '");
+            localStorage.setItem("username", "' . addslashes($user['name']) . '");
+            window.location.href = "list_users.php";
+        </script>';
         exit();
     } else {
         $errors = 'Sai username hoặc password';
@@ -25,12 +39,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 ?>
 
+
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>User form</title>
     <?php include 'views/meta.php' ?>
 </head>
+
 <body>
     <?php include 'views/header.php' ?>
 
@@ -82,4 +99,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </div>
 </body>
+
 </html>
