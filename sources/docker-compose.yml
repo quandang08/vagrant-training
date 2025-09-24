@@ -42,6 +42,7 @@ services:
       PMA_HOST: web-mysql
       PMA_USER: ${DB_USERNAME}
       PMA_PASSWORD: ${DB_PASSWORD}
+      
   redis:
     image: redis:latest
     container_name: web-redis
