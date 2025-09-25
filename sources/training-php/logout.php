@@ -9,7 +9,7 @@ $sessionId = $_COOKIE['session_id'] ?? null;
 if ($sessionId) {
     $key = "session_user_" . $sessionId;
     // Xoá session trên Redis
-    $redis->del($key);
+    $redis->del($key, $key . ':meta');
 
     // Xoá cookie
     setcookie('session_id', '', time() - 3600, '/');
