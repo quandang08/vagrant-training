@@ -1,4 +1,9 @@
 <?php
+header("X-Frame-Options: SAMEORIGIN");
+header("X-Content-Type-Options: nosniff");
+header("Referrer-Policy: no-referrer-when-downgrade");
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'");
+
 require_once 'models/UserModel.php';
 
 $userModel = new UserModel();
@@ -18,27 +23,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Tạo sessionId mới
         $sessionId = bin2hex(random_bytes(16));
         $sessionKey = "session_user_" . $sessionId;
-        $user['name'] = $user['username']; 
-        $redis->setex($sessionKey, 1800, json_encode($user)); // TTL 30 phút
+
+        // lưu payload (để kiểm tra metadata)
+        $payload = [
+            'id' => $user['id'],
+            'username' => $user['username'],
+            'ua_hash' => hash('sha256', $_SERVER['HTTP_USER_AGENT'] ?? ''),
+            'ip' => $_SERVER['REMOTE_ADDR'] ?? '',
+        ];
+
+        // lưu payload
+        $redis->setex($sessionKey, 1800, json_encode($payload)); // TTL 30 phút
 
         // Cookie server
-        setcookie("session_id", $sessionId, time() + 1800, "/");
+        // setcookie("session_id", $sessionId, time() + 1800, "/");
+
+        // set cookie an toàn (HttpOnly, Secure, SameSite)
+        setcookie('session_id', $sessionId, [
+            'expires' => time() + 1800,
+            'path' => '/',
+            'httponly' => true,
+            'samesite' => 'Lax',
+            'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'
+        ]);
+        // (không bắt buộc) lưu 1 token CSRF kèm session:
+        $csrf = bin2hex(random_bytes(16));
+        $redis->hSet($sessionKey . ':meta', 'csrf', $csrf);
+        $redis->expire($sessionKey . ':meta', 1800);
 
         // JS lưu localStorage
-        echo '<script>
-            localStorage.clear(); // xóa dữ liệu cũ
-            localStorage.setItem("session_id", "' . $sessionId . '");
-            localStorage.setItem("user_id", "' . $user['id'] . '");
-            localStorage.setItem("username", "' . addslashes($user['name']) . '");
-            window.location.href = "list_users.php";
-        </script>';
+        echo "<script>
+            localStorage.setItem('username', " . json_encode($user['username']) . ");
+            window.location.href = 'list_users.php';
+            </script>";
         exit();
     } else {
         $errors = 'Sai username hoặc password';
     }
 }
 ?>
-
 
 <!DOCTYPE html>
 <html>
