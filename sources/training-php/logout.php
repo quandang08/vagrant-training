@@ -29,7 +29,6 @@ session_destroy();
         localStorage.removeItem('session_id');
         localStorage.removeItem('user_id');
         localStorage.removeItem('username');
-        // Redirect về login
         window.location.href = 'login.php';
     </script>
 </head>

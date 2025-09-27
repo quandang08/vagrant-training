@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'samesite' => 'Lax',
             'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'
         ]);
-        // (không bắt buộc) lưu 1 token CSRF kèm session:
+        // lưu 1 token CSRF kèm session:
         $csrf = bin2hex(random_bytes(16));
         $redis->hSet($sessionKey . ':meta', 'csrf', $csrf);
         $redis->expire($sessionKey . ':meta', 1800);

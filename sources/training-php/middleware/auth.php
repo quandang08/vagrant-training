@@ -1,4 +1,8 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 $redis = new Redis();
 $redis->connect('web-redis', 6379);
 
