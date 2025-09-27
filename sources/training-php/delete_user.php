@@ -1,13 +1,32 @@
 <?php
+require_once 'middleware/auth.php';
 require_once 'models/UserModel.php';
-$userModel = new UserModel();
 
-$user = NULL; //Add new user
-$id = NULL;
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $id = (int)($_POST['id'] ?? 0);
+    $csrf = $_POST['csrf_token'] ?? '';
 
-if (!empty($_GET['id'])) {
-    $id = $_GET['id'];
-    $userModel->deleteUserById($id);//Delete existing user
+    // check CSRF
+    if ($csrf !== ($_SESSION['csrf_token'] ?? '')) {
+        die("CSRF token invalid");
+    }
+
+    // chỉ cho admin xóa
+    if ($currentUser['type'] !== 'admin') {
+        die("Bạn không có quyền xóa user!");
+    }
+
+    // không cho tự xóa chính mình
+    if ($id === (int)$currentUser['id']) {
+        die("Không thể tự xóa chính mình");
+    }
+
+    $userModel = new UserModel();
+    if ($userModel->deleteUserById($id)) {
+        header("Location: list_users.php?deleted=1");
+        exit;
+    } else {
+        die("Xóa user thất bại");
+    }
 }
-header('location: list_users.php');
 ?>
